@@ -34,9 +34,23 @@
 |SensitivityStudy|模型/范围绑定、r/p/m/seed锁定|采样研究|
 |SensitivityRun|排队状态、完整输入与结果、EE轨迹和全局指数|运行底稿|
 |FactorReview|研究说明与主管批准状态|试验归档|
-|Report|批准后不可变快照与CSV|试验归档|
+|Report|批准后不可变快照与CSV，按版本链区分当前版/历史版|试验归档|
+|CorrectionRequest|选错运行的更正申请、替换运行、主管审批与后继版本指针|试验归档|
 
 「因子总览」汇集真实基线结果；另有登录与管理员审计页。总览/运行共用Morris散点图、Sobol条形图和采样预算组件；模型系数在模型页与锁定运行中共用展示。
+
+## 底稿更正（换运行）工作流
+
+已归档底稿若选错运行，分析师在「试验归档」页对**当前版**提交更正申请（`POST /corrections`）：填写原因，并改选**同一研究**下另一条**已完成**运行；排队中、计算中或失败的运行、跨研究运行以及与当前底稿相同的运行均被拒绝，同一底稿同时只允许一张待审申请。
+
+主管在审批队列中处理：
+
+- **批准**（`POST /corrections/{id}/approve`）时才在同一事务内为替换运行创建已批准复核，并发布一个后继 `Report`：版本号递增、`root_id` 指向版本链根、`predecessor_id` 指向上一版；旧版 `snapshot` 与 CSV 一个字节都不改，仅由「当前版」变为「历史版」。待审或驳回期间原版始终有效。
+- **驳回**（`POST /corrections/{id}/reject`，可填说明）不产生新版本，原版继续有效；驳回后允许重新申请。
+
+并发与重复安全：`reports.predecessor_id` 上有唯一约束，数据库层保证一个底稿最多一个后继；批准事务内对申请行与底稿行加锁并复查状态，重复批准或并发批准同一版的不同申请，最多发布一个后继版本（后者收到409）。
+
+双向追溯：后继报告的 `snapshot.correction` 记录申请ID、原因、申请人、前后运行ID与上一版报告ID；`CorrectionRequest.successor_report_id` 反向指向发布结果。`GET /reports/{id}/versions` 返回整条版本链，页面以「当前版/历史版」徽标分区展示，各版 CSV 独立下载。现有已批准底稿由启动迁移自动回填为 V1（`version=1, root_id=自身`），无需手工处理即可直接纳入更正。
 
 ## 模型与输入限制
 
@@ -86,7 +100,7 @@ docker compose exec backend python scripts/seed_demo.py
 
 前端 http://localhost:18233，后端 http://localhost:19233/docs，健康检查 `/health`；MySQL端口17733、库/用户名sensitivity、演示密码sensitivity_demo。
 
-账号 `admin@sensitivity.demo`、`analyst@sensitivity.demo`、`viewer@sensitivity.demo`，统一密码 `FactorDemo2026!`。seed固定自然ID、只补缺，不覆盖用户说明；初次启动 `SEED_DEMO=true` 自动执行。基线运行由seed直接预计算，新建运行真实进入Redis后台worker。
+账号 `admin@sensitivity.demo`、`analyst@sensitivity.demo`、`viewer@sensitivity.demo`，统一密码 `FactorDemo2026!`。seed固定自然ID、只补缺，不覆盖用户说明；初次启动 `SEED_DEMO=true` 自动执行。基线运行由seed直接预计算，并额外预计算同一研究的 `demo-run-corrected` 已完成运行用于演示底稿更正；新建运行真实进入Redis后台worker。
 
 ```sh
 docker compose ps
@@ -106,7 +120,7 @@ docker compose down -v --remove-orphans
 |存储/任务|MySQL8.4（验收8.4.11）、Redis7.4列表队列|
 |容器|frontend/Nginx1.28、backend、worker、db、redis，恰好五服务|
 
-`backend/src/{models,schemas,services,controllers,routes}`贯穿六聚合；`middlewares`处理审计与全局错误，`utils`处理JWT/PBKDF2/队列；`backend/scripts/seed_demo.py`负责自然键幂等seed。`backend/migrations`记录新库初始化方式；已有生产库需单独审查增量迁移。
+`backend/src/{models,schemas,services,controllers,routes}`贯穿六聚合与更正申请；`middlewares`处理审计与全局错误，`utils`处理JWT/PBKDF2/队列；`backend/scripts/seed_demo.py`负责自然键幂等seed。`backend/migrations`记录新库初始化方式；已有生产库按 `migrations/002_report_corrections.sql` 增量迁移（reports 增加版本链列与唯一索引、新建 correction_requests 表），应用启动时也会对旧库自动补列并回填 V1。
 
 `frontend/src/{api,stores,types,components/common,hooks,pages,router,utils,constants}`拆分职责。所有模型计算、业务校验与持久化在Python，前端仅作输入、选择和绘制真实结果。
 
@@ -122,7 +136,7 @@ docker compose down -v --remove-orphans
 
 JWT未认证401，角色不足403，缺实体404，名称重复或状态冲突409，非法输入422；后端全局错误提供可恢复提示。审计记录写入路径、方法、响应码、认证账号，不记录密码/Token/模型正文。单worker无分布式任务重试保证，失败任务保留原因，可重新执行。
 
-共享枚举：`backend/src/constants/enums.py` 与 `frontend/src/constants/enums.ts` 定义角色、运行状态、复核状态。认证、任务/复核服务以及前端权限与状态显示使用同一组取值；枚举定义不参与数值估计。
+共享枚举：`backend/src/constants/enums.py` 与 `frontend/src/constants/enums.ts` 定义角色、运行状态、复核状态与更正申请状态（submitted/approved/rejected）。认证、任务/复核/更正服务以及前端权限与状态显示使用同一组取值；枚举定义不参与数值估计。
 
 测试、截图、日志与TESTING放在同批 `test-artifacts/gb-2404/`，源码不混入测试产物。依赖通过npm ci锁定，`.env`、node_modules、构建产物与日志被忽略。
 

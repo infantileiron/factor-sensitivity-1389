@@ -10,5 +10,6 @@ from .elementary_effect import ElementaryEffect
 from .evaluation import EvaluationPoint
 from .review import FactorReview
 from .report import Report
+from .correction import CorrectionRequest
 from .user import User
 from .audit import Audit

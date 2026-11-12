@@ -13,6 +13,7 @@ from src.models.study import SensitivityStudy
 from src.models.run import SensitivityRun
 from src.models.review import FactorReview
 from src.models.report import Report
+from src.models.correction import CorrectionRequest
 from src.utils.security import hash_password
 from src.services.run_service import compute
 def seed():
@@ -36,9 +37,11 @@ def seed():
   if not db.get(SensitivityRun,'demo-run'):db.add(SensitivityRun(id='demo-run',study_id='demo-study',status='queued',result={},error=''))
   db.commit();run=db.get(SensitivityRun,'demo-run')
   if run.status=='queued':compute(db,'demo-run')
+  if not db.get(SensitivityRun,'demo-run-corrected'):
+   db.add(SensitivityRun(id='demo-run-corrected',study_id='demo-study',status='queued',result={},error=''));db.commit();compute(db,'demo-run-corrected')
   run=db.get(SensitivityRun,'demo-run')
   if run.status=='completed':
    if not db.get(FactorReview,'demo-review'):db.add(FactorReview(id='demo-review',run_id='demo-run',action='已核对物理范围、归一EE分母与有限采样；仅模拟代理敏感度，不宣称真实节能收益。',state='approved',reviewer='admin@sensitivity.demo'));db.flush()
-   if not db.get(Report,'demo-report'):db.add(Report(id='demo-report',review_id='demo-review',title='XH-C06 冷却代理因子底稿',snapshot={'result':run.result,'action':'已核对模拟代理假设与有限样本边界','reviewer':'admin@sensitivity.demo'}))
-  db.commit();counts={t.__tablename__:db.scalar(select(func.count()).select_from(t)) for t in [User,ResponseModel,ModelFactor,ModelInteraction,FactorSpace,FactorRange,SensitivityStudy,SensitivityRun,FactorReview,Report]};print(json.dumps(counts));return counts
+   if not db.get(Report,'demo-report'):db.add(Report(id='demo-report',review_id='demo-review',title='XH-C06 冷却代理因子底稿',version=1,root_id='demo-report',predecessor_id=None,snapshot={'result':run.result,'action':'已核对模拟代理假设与有限样本边界','reviewer':'admin@sensitivity.demo'}))
+  db.commit();counts={t.__tablename__:db.scalar(select(func.count()).select_from(t)) for t in [User,ResponseModel,ModelFactor,ModelInteraction,FactorSpace,FactorRange,SensitivityStudy,SensitivityRun,FactorReview,Report,CorrectionRequest]};print(json.dumps(counts));return counts
 if __name__=='__main__':seed()

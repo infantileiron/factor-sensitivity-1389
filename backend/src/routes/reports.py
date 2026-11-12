@@ -10,6 +10,8 @@ def listing(db=Depends(get_db),user=Depends(current)):return controller.list_all
 def detail(ident:str,db=Depends(get_db),user=Depends(current)):return controller.detail(db,ident)
 @router.post('',status_code=201)
 def create(body:ReportCreate,db=Depends(get_db),user=Depends(admin)):return controller.create(db,body)
+@router.get('/{ident}/versions')
+def versions(ident:str,db=Depends(get_db),user=Depends(current)):return controller.versions(db,ident)
 @router.get('/{ident}/csv')
 def csv_export(ident:str,db=Depends(get_db),user=Depends(current)):
  from ..models.report import Report

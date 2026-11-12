@@ -1,1 +1,1 @@
-import {request} from './client';export const list=()=>request('/reports');export const create=(body:unknown)=>request('/reports','POST',body);
+import {request} from './client';export const list=()=>request('/reports');export const create=(body:unknown)=>request('/reports','POST',body);export const versions=(id:string)=>request('/reports/'+id+'/versions');

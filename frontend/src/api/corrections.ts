@@ -1,0 +1,1 @@
+import {request} from './client';export const list=()=>request('/corrections');export const create=(body:unknown)=>request('/corrections','POST',body);export const decide=(id:string,path:'approve'|'reject',note='')=>request('/corrections/'+id+'/'+path,'POST',{note});

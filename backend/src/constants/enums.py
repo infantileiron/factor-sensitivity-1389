@@ -11,3 +11,7 @@ class RunStatus(StrEnum):
 class ReviewState(StrEnum):
  SUBMITTED="submitted"
  APPROVED="approved"
+class CorrectionState(StrEnum):
+ SUBMITTED="submitted"
+ APPROVED="approved"
+ REJECTED="rejected"

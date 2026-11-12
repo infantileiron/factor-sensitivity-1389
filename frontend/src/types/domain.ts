@@ -1,2 +1,4 @@
 export type Role='admin'|'analyst'|'viewer';export interface User{email:string;role:Role}export interface Entity{id:string;created_at:string;[key:string]:any}
 export interface FactorMetric{factor_id:string;name:string;unit:string;linear:number;quadratic:number;low:number;high:number;mu:number;mu_star:number;sigma:number;s1:number;st:number;gap:number;effects:number[];effect_count:number;sigma_denominator:number}
+export interface Report extends Entity{review_id:string;title:string;snapshot:any;version:number;root_id:string;predecessor_id:string|null;is_current:boolean;backing_run_id:string;study_id:string|null}
+export interface CorrectionRequest extends Entity{report_id:string;replacement_run_id:string;reason:string;state:'submitted'|'approved'|'rejected';requester:string;reviewer:string;review_note:string;successor_report_id:string|null}
